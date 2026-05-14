@@ -50,6 +50,11 @@ public class PaymentWorker {
             Order order = orderRepository.findById(UUID.fromString(orderId))
                     .orElseThrow(() -> new RuntimeException("Order not found in DB: " + orderId));
 
+        if (order.getStatus() == OrderStatus.SUCCESS || order.getStatus() == OrderStatus.FAILED) {
+            System.out.println("[IDEMPOTENCY] Order " + orderId + " was already processed. Dropping duplicate event.");
+            return; // Instantly exit the method. Do not send to Kafka again.
+        }
+
             RiskAssessment assessment = evaluateRisk(amount);
 
             String finalStatus = assessment.isApproved ? "SUCCESS" : "FAILED";
