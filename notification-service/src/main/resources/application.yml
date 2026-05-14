@@ -7,9 +7,9 @@ spring:
     properties:
       security.protocol: SSL
       ssl.endpoint.identification.algorithm: https
-      ssl.truststore.location: client.truststore.jks
+      ssl.truststore.location: /app/client.truststore.jks
       ssl.truststore.password: password
-      ssl.keystore.location: classpath:client.keystore.jks
+      ssl.keystore.location: /app/client.keystore.jks
       ssl.keystore.password: password
       ssl.key.password: password
     consumer:
