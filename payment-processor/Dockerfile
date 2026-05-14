@@ -23,4 +23,5 @@ COPY --from=build /app/target/classes/client.keystore.jks /app/client.keystore.j
 EXPOSE 8080
 
 # Run the application
+RUN ls -la /app
 ENTRYPOINT ["java", "-jar", "app.jar"]
