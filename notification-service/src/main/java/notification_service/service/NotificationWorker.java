@@ -1,6 +1,7 @@
 package notification_service.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -8,41 +9,74 @@ import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+
 @Service
 @RequiredArgsConstructor
 public class NotificationWorker {
 
-    private final JavaMailSender mailSender;
+    @Value("${RESEND_API_KEY}")
+    private String resendApiKey;
+
+    @Value("${app.email.from}")
+    private String fromEmail;
+
     private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = "payment-status", groupId = "notification-group")
-    public void processPaymentNotification(String payload) {
-        System.out.println("\n[NOTIFICATION] Received payment status update. Parsing payload...");
+    public void handlePaymentNotification(String message) {
+        System.out.println("PROCESSING KAFKA EVENT: " + message);
 
         try {
-            JsonNode data = objectMapper.readTree(payload);
-            String email = data.get("email").asText();
-            String status = data.get("status").asText();
-            String orderId = data.get("orderId").asText();
+            // 1. Parse the incoming Kafka JSON string
+            JsonNode payload = objectMapper.readTree(message);
 
-            if("SUCCESS".equalsIgnoreCase(status)) {
-                sendEmail(email,"Payment Successful - PayFlow", "Your payment for order " + orderId + " was successful. Thank you!");
-            } else if ("FAILED".equalsIgnoreCase(status)) {
-                sendEmail(email,"Payment Failed - Action Required", "Your payment for order " + orderId + " failed. Please try again.");
+            // 2. Extract the exact variables dynamically
+            String recipientEmail = payload.get("email").asText();
+            String orderId = payload.get("orderId").asText();
+            String status = payload.get("status").asText();
+
+            // 3. Build a professional HTML email template
+            String htmlBody = """
+                    <div style="font-family: Arial, sans-serif; padding: 20px;">
+                        <h2>Payment %s</h2>
+                        <p>Thank you for your order. Your payment has been successfully processed.</p>
+                        <p><strong>Order ID:</strong> %s</p>
+                    </div>
+                    """.formatted(status, orderId);
+
+            String resendPayload = """
+                    {
+                      "from": "%s",
+                      "to": ["%s"],
+                      "subject": "PayFlow Update: Order %s",
+                      "html": "%s"
+                    }
+                    """.formatted(fromEmail, recipientEmail, orderId, htmlBody.replace("\"", "\\\"").replace("\n", ""));
+
+            // 5. Fire the HTTP Request
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create("https://api.resend.com/emails"))
+                    .header("Authorization", "Bearer " + resendApiKey)
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(resendPayload))
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                System.out.println("SUCCESS: Email delivered to " + recipientEmail);
+            } else {
+                System.err.println("RESEND API ERROR: " + response.statusCode() + " - " + response.body());
             }
 
         } catch (Exception e) {
-            System.err.println("[NOTIFICATION-ERROR] Failed to process notification: " + e.getMessage());        }
-    }
-
-    private void sendEmail(String to, String subject, String text) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom("noreply@payflow.com");
-        message.setTo(to);
-        message.setText(text);
-        message.setSubject(subject);
-
-        mailSender.send(message);
-        System.out.println("[NOTIFICATION] Email successfully dispatched to: " + to);
+            System.err.println("FATAL ERROR processing notification: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 }
