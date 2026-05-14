@@ -17,6 +17,9 @@ WORKDIR /app
 # Ensure the JAR name matches your pom.xml artifactId
 COPY --from=build /app/target/*.jar app.jar
 
+COPY --from=build /app/src/main/resources/client.truststore.jks ./client.truststore.jks
+COPY --from=build /app/src/main/resources/client.keystore.jks ./client.keystore.jks
+
 EXPOSE 8080
 
 # Run the application
