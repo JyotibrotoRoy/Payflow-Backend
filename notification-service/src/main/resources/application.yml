@@ -2,6 +2,7 @@ server:
   port: 8082
 
 spring:
+  # Email Configuration
   mail:
     host: smtp.gmail.com
     port: 587
@@ -15,3 +16,10 @@ spring:
             enable: true
 
 
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+    consumer:
+      group-id: notification-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
