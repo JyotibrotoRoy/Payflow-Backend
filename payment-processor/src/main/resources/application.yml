@@ -21,12 +21,10 @@ spring:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     properties:
       security.protocol: SSL
-      ssl.endpoint.identification.algorithm: https
-      ssl.truststore.location: classpath:client.truststore.jks
-      ssl.truststore.password: password
-      ssl.keystore.location: classpath:client.keystore.jks
-      ssl.keystore.password: password
-      ssl.key.password: password
+      ssl.truststore.type: PEM
+      ssl.truststore.location: ${KAFKA_SSL_TRUSTSTORE_LOCATION:}
+      ssl.keystore.type: PEM
+      ssl.keystore.location: ${KAFKA_SSL_KEYSTORE_LOCATION:}
     consumer:
       group-id: payment-processor-group
       auto-offset-reset: earliest
