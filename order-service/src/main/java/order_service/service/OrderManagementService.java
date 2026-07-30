@@ -29,6 +29,9 @@ public class OrderManagementService {
     @Value("${razorpay.webhook-secret}")
     private String webhookSecret;
 
+    @Value("${razorpay.key-secret}")
+    private String keySecret;
+
     public OrderManagementService(
             OrderRepository orderRepository,
             @Value("${razorpay.key-id}") String keyId,
@@ -75,6 +78,43 @@ public class OrderManagementService {
 
         } catch (RazorpayException e) {
             throw new RuntimeException("Failed to create a RazorPay order: " + e.getMessage());
+        }
+    }
+
+    @Transactional
+    public void verifyPaymentAndPublishEvent(String razorpayOrderId, String razorpayPaymentId, String razorpaySignature) {
+
+        try {
+            // 1. Verify the signature so users can't fake a success response
+            JSONObject options = new JSONObject();
+            options.put("razorpay_order_id", razorpayOrderId);
+            options.put("razorpay_payment_id", razorpayPaymentId);
+            options.put("razorpay_signature", razorpaySignature);
+
+
+            boolean isValid = com.razorpay.Utils.verifyPaymentSignature(options, keySecret);
+
+            if (!isValid) {
+                throw new SecurityException("CRITICAL: Invalid Razorpay signature. Possible fraud attempt.");
+            }
+        } catch (RazorpayException e) {
+            throw new RuntimeException("Signature verification failed", e);
+        }
+        Order order = orderRepository.findByRazorpayOrderId(razorpayOrderId)
+                .orElseThrow(() -> new RuntimeException("Order not found for Razorpay ID: " + razorpayOrderId));
+
+        // 3. Dropping the event into Kafka to trigger Risk Engine
+        try {
+            JSONObject payload = new JSONObject();
+            payload.put("internalOrderId", order.getId());
+            payload.put("amount", order.getAmount());
+            payload.put("razorpayPaymentId", razorpayPaymentId);
+
+            kafkaTemplate.send("payment-events", payload.toString());
+            System.out.println("Payment event successfully published to Kafka for Order: " + order.getId());
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to publish to Kafka", e);
         }
     }
 }

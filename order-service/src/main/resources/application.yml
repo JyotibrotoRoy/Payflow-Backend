@@ -24,6 +24,12 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    properties:
+      security.protocol: SSL
+      ssl.truststore.type: PEM
+      ssl.truststore.location: ${KAFKA_SSL_TRUSTSTORE_LOCATION:}
+      ssl.keystore.type: PEM
+      ssl.keystore.location: ${KAFKA_SSL_KEYSTORE_LOCATION:}
 
 razorpay:
   key-id: ${RAZORPAY_KEY_ID}

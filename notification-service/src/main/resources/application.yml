@@ -19,3 +19,7 @@ spring:
 app:
   email:
     from: ${RESEND_FROM_EMAIL}
+
+discord:
+  webhook:
+    url: ${DISCORD_WEBHOOK_URL}

@@ -23,4 +23,23 @@ public class OrderController {
         return ResponseEntity.ok(Map.of("razorpayOrderId", razorpayOrderId));
     }
 
+    @PostMapping("/verify")
+    public ResponseEntity<String> verifyPayment(@RequestBody Map<String, String> payload) {
+        // The frontend sends the 3 Razorpay signature variables here
+        String razorpayOrderId = payload.get("razorpay_order_id");
+        String razorpayPaymentId = payload.get("razorpay_payment_id");
+        String razorpaySignature = payload.get("razorpay_signature");
+
+        if (razorpayOrderId == null || razorpayPaymentId == null || razorpaySignature == null) {
+            return ResponseEntity.badRequest().body("Missing required Razorpay parameters in request body.");
+        }
+
+        try {
+            orderManagementService.verifyPaymentAndPublishEvent(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+            return ResponseEntity.ok("Payment verified successfully.");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Verification failed: " + e.getMessage());
+        }
+    }
+
 }
